@@ -20,12 +20,19 @@ function fail(error){if(error?.name==='AbortError')return;const n=$('#error');n.
 function clearError(){$('#error').hidden=true;$('#error').textContent='';}
 async function api(path,body,{cancellable=true,timeout=15000}={}){
  const controller=new AbortController();if(cancellable)requests.add(controller);
- const timer=setTimeout(()=>controller.abort(),timeout);
+ let timedOut=false;
+ const timer=setTimeout(()=>{if(!controller.signal.aborted){timedOut=true;controller.abort();}},timeout);
  try{
   const response=await fetch(path,{method:body===undefined?'GET':'POST',headers:body===undefined?{}:{'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body),signal:controller.signal});
   const data=await response.json();
   if(!response.ok){const error=new Error(data.error?.message||'The local server could not complete this request.');error.code=data.error?.code;error.status=response.status;throw error;}
   return data;
+ }catch(error){
+  if(timedOut&&error?.name==='AbortError'){
+   const timeoutError=new Error('The local server did not respond in time. Try again; your current changes are still open.');
+   timeoutError.code='request_timeout';throw timeoutError;
+  }
+  throw error;
  }finally{clearTimeout(timer);requests.delete(controller);}
 }
 function retire(id){
@@ -38,7 +45,7 @@ function retire(id){
 async function flushRetired(){await Promise.all([...retirePending].map(retire));}
 function envelope(){return{format:'loopkind-demo',version:1,mode:'local-demo',project:copy(S.project),selectedPlan:S.plan?copy(S.plan):null,approvals:[],history:[]};}
 function scheduleSave(){
- clearTimeout(saveTimer);$('#save-status').textContent='Saving this project…';const epoch=S.epoch,revision=++saveRevision;
+ clearTimeout(saveTimer);$('#save-status').classList.remove('save-failed');$('#save-status').textContent='Saving this project…';const epoch=S.epoch,revision=++saveRevision;
  saveTimer=setTimeout(async()=>{
   if(!S.project)return;
   try{
@@ -46,7 +53,14 @@ function scheduleSave(){
    if(epoch!==S.epoch||revision!==saveRevision)return;
    localStorage.setItem(STORAGE,JSON.stringify({format:safe.format,version:safe.version,mode:safe.mode,project:safe.project,selectedPlan:safe.selectedPlan,approvals:[],history:[]}));
    $('#save-status').textContent='Saved here · reviews reset on reopening';
-  }catch(error){if(epoch===S.epoch&&revision===saveRevision&&error.name!=='AbortError')$('#save-status').textContent='Not saved yet · check the edited fields';}
+  }catch(error){
+   if(epoch!==S.epoch||revision!==saveRevision||error.name==='AbortError')return;
+   const status=$('#save-status');status.classList.add('save-failed');
+   status.textContent=error.code==='request_timeout'?'Not saved yet · server response timed out.':'Not saved yet · check the edited fields';
+   if(error.code==='request_timeout'){
+    const retry=button('Retry save','small quiet',scheduleSave);retry.id='retry-save-btn';status.append(' ',retry);
+   }
+  }
  },300);
 }
 function invalidate(reason,{refreshPeople=false}={}){
@@ -58,11 +72,14 @@ function invalidate(reason,{refreshPeople=false}={}){
  clearError();renderPlan();renderDraft();updateButtons();scheduleSave();
  if(refreshPeople)renderPeople();
 }
-function editMember(id,field,value,{refresh=true}={}){
+function editMember(id,field,value,{refresh=false}={}){
  const member=person(id);if(!member)return;
  member[field]=value;if(field!=='confirmed')member.confirmed=false;
  invalidate(field==='active'&&!value?member.name+' withdrew. The previous proposal is no longer available.':'Details changed. Find a new plan, then review it together.',{refreshPeople:refresh});
- if(field==='name'&&refresh)renderIntake();
+ if(!refresh)refreshMemberSummary(member);
+ if(field==='name'){
+  for(const entry of $('#intake-person').options)if(entry.value===id)entry.textContent=member.name;
+ }
 }
 function labeled(labelText,control,full=false){
  const label=node('label',full?'full-width':'',labelText);label.htmlFor=control.id;label.append(control);return label;
@@ -74,6 +91,30 @@ function selectFor(id,values,value,change){
 }
 function inputFor(id,type,value,change,event='change'){
  const input=node('input');input.id=id;input.type=type;input.value=value??'';input.addEventListener(event,()=>change(input.value));return input;
+}
+function availabilityText(member){
+ return (member.windows.length?member.windows.map(w=>time(w.start)+'–'+time(w.end)).join(' · '):'Add availability')+(member.durationMinutes?' · gives '+member.durationMinutes+' min':'');
+}
+function windowHintText(member){
+ return 'Use 15-minute boundaries on '+S.project.date+' at UTC'+S.project.utcOffset+'.'+(member.windows.some(window=>window.end===1440)?' 24:00 means the end of this day.':'')+' A session must fit without a break.';
+}
+function refreshMemberSummary(member){
+ const card=[...$('#people-list').children].find(card=>card.dataset.member===member.id);if(!card)return;
+ card.classList.toggle('inactive',!member.active);
+ card.querySelector('h3').textContent=member.name||'Unnamed person';
+ card.querySelector('.avatar').textContent=(member.name.trim()[0]||'?').toUpperCase();
+ const state=card.querySelector('.person-state');
+ state.className='person-state '+(!member.active?'withdrawn':!member.confirmed?'needs-review':'');
+ state.textContent=!member.active?'Withdrawn from this day':member.confirmed?'Details reviewed':'Details need review';
+ const skills=card.querySelectorAll('.give-get strong');skills[0].textContent=skill(member.offer);skills[1].textContent=skill(member.need);
+ card.querySelector('.availability-summary').textContent=availabilityText(member);
+ document.getElementById(member.id+'-window-hint').textContent=windowHintText(member);
+ for(const field of ['active','confirmed'])document.getElementById(member.id+'-'+field).checked=member[field];
+ card.querySelectorAll('.window-row').forEach((row,index)=>{
+  row.querySelector('input').setAttribute('aria-label',member.name+' available from '+(index+1));
+  row.querySelector('select').setAttribute('aria-label',member.name+' available until '+(index+1));
+  row.querySelector('button').setAttribute('aria-label','Remove '+member.name+' time window '+(index+1));
+ });
 }
 function renderPeople(){
  if(!S.project)return;
@@ -88,11 +129,9 @@ function renderPeople(){
   for(const[label,value]of[['Can give',member.offer],['Would welcome',member.need]]){
    const cell=node('div');add(cell,node('span','mini-label',label),node('strong','',skill(value)));giveGet.append(cell);
   }
-  const available=member.windows.length?member.windows.map(w=>time(w.start)+'–'+time(w.end)).join(' · '):'Add availability';
-  add(summary,giveGet,node('p','availability-summary',available+(member.durationMinutes?' · gives '+member.durationMinutes+' min':'')));
+  add(summary,giveGet,node('p','availability-summary',availabilityText(member)));
   const form=node('div','member-form'),grid=node('div','field-grid');
   const nameInput=inputFor(member.id+'-name','text',member.name,v=>editMember(member.id,'name',v,{refresh:false}),'input');nameInput.maxLength=80;
-  nameInput.addEventListener('change',()=>{renderPeople();renderIntake();});
   grid.append(labeled('Name',nameInput,true));
   const choices=[['','Needs an answer'],...S.project.skills.map(s=>[s.id,s.label])];
   grid.append(labeled('Can help with',selectFor(member.id+'-offer',choices,member.offer,v=>editMember(member.id,'offer',v||null))));
@@ -102,16 +141,16 @@ function renderPeople(){
   grid.append(labeled('When can I give?',selectFor(member.id+'-after',[['','Needs an answer'],['true','After I receive my help'],['false','I can give before receiving']],member.afterReceive,v=>editMember(member.id,'afterReceive',v===''?null:v==='true')),true));
   form.append(grid);
   const windowLabel=node('div','window-label','Available in these windows');
-  windowLabel.append(button('+ Add time','small quiet',()=>{if(member.windows.length>=16)return;editMember(member.id,'windows',[...member.windows,{start:540,end:660}]);}));
+  windowLabel.append(button('+ Add time','small quiet',()=>{if(member.windows.length>=16)return;editMember(member.id,'windows',[...member.windows,{start:540,end:660}],{refresh:true});}));
   form.append(windowLabel);
   member.windows.forEach((window,index)=>{
    const row=node('div','window-row'),start=inputFor(member.id+'-start-'+index,'time',time(window.start),v=>{const next=copy(member.windows);next[index].start=minutes(v);editMember(member.id,'windows',next);});
    const end=selectFor(member.id+'-end-'+index,Array.from({length:96},(_,i)=>{const value=time((i+1)*15);return[value,value];}),time(window.end),v=>{const next=copy(member.windows);next[index].end=minutes(v);editMember(member.id,'windows',next);});
    start.step='900';start.setAttribute('aria-label',member.name+' available from '+(index+1));end.setAttribute('aria-label',member.name+' available until '+(index+1));end.setAttribute('aria-describedby',member.id+'-window-hint');
-   const remove=button('×','',()=>editMember(member.id,'windows',member.windows.filter((_,i)=>i!==index)));remove.className='icon-button';remove.setAttribute('aria-label','Remove '+member.name+' time window '+(index+1));
+   const remove=button('×','',()=>editMember(member.id,'windows',member.windows.filter((_,i)=>i!==index),{refresh:true}));remove.className='icon-button';remove.setAttribute('aria-label','Remove '+member.name+' time window '+(index+1));
    add(row,start,node('span','','–'),end,remove);form.append(row);
   });
-  const windowHint=node('p','field-hint','Use 15-minute boundaries on '+S.project.date+' at UTC'+S.project.utcOffset+'.'+(member.windows.some(window=>window.end===1440)?' 24:00 means the end of this day.':'')+' A session must fit without a break.');windowHint.id=member.id+'-window-hint';form.append(windowHint);
+  const windowHint=node('p','field-hint',windowHintText(member));windowHint.id=member.id+'-window-hint';form.append(windowHint);
   const checks=node('div','checks');
   for(const[field,text]of[['active','Include me in this day'],['confirmed','I have checked my offer, time and requirements']]){
    const label=node('label','check-label'+(field==='confirmed'?' review-check':'')),input=node('input');input.type='checkbox';input.id=member.id+'-'+field;input.checked=member[field];input.addEventListener('change',()=>editMember(member.id,field,input.checked));
@@ -152,6 +191,21 @@ function renderPlan(){
  const strip=node('div','circle-strip');strip.setAttribute('aria-label','Giving order around the circle');
  plan.members.forEach((id,i)=>{const chip=node('span','circle-member');add(chip,avatar(id),node('span','',name(id)));strip.append(chip);if(i<plan.members.length-1)strip.append(node('span','circle-arrow','→'));});
  strip.append(node('span','loop-return','↺ back to '+name(plan.members[0])));root.append(strip);
+ const omitted=S.project.members.filter(member=>!plan.members.includes(member.id));
+ if(omitted.length){
+  const aside=node('aside','circle-omissions');aside.id='circle-omissions';aside.setAttribute('aria-labelledby','circle-omissions-title');
+  const heading=node('h4','','Not in this circle');heading.id='circle-omissions-title';aside.append(heading);
+  const list=node('ul');
+  const labels={unreviewed:'details need review',materials_not_ready:'materials or setup are not confirmed ready',incomplete:'required details are unanswered'};
+  for(const member of omitted){
+   const blocked=S.result?.blockedMembers.find(item=>item.id===member.id);
+   const reason=blocked?.reasons.includes('inactive')?'withdrawn from this day':blocked?blocked.reasons.map(reason=>labels[reason]||reason).join('; '):'not included in this proposal';
+   const item=node('li');item.dataset.omittedMember=member.id;
+   add(item,node('strong','',member.name),node('span','',reason+'.'));list.append(item);
+  }
+  aside.append(list);root.append(aside);
+ }
+
  const timeline=node('div','timeline');timeline.id='timeline';
  add(timeline,add(node('div','timeline-title'),node('strong','','Everyone’s time, together'),node('span','','Both people attend each session')));
  const axis=node('div','time-axis');add(axis,node('span','',time(plan.metrics.startsAt)),node('span','',time(Math.round((plan.metrics.startsAt+plan.metrics.finishesAt)/2))),node('span','',time(plan.metrics.finishesAt)));timeline.append(axis);
@@ -384,7 +438,7 @@ $('#import-btn').addEventListener('click',()=>$('#import-file').click());
 $('#import-file').addEventListener('change',e=>openFile(e.target.files[0]));
 async function initialize(){
  updateButtons();
- const providerTask=api('/api/status').then(data=>{
+ const providerTask=api('/api/status',undefined,{cancellable:false}).then(data=>{
   S.provider=data.provider;
   $('#provider-status').textContent=data.provider.configured?'Optional NVIDIA interpretation on Nebius is configured. Every suggestion still needs your review.':'Optional note interpretation is not configured on this server. You can enter and review every field manually.';
   updateButtons();

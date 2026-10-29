@@ -1,0 +1,30 @@
+{
+  "format": "loopkind-private-preview-source-v1",
+  "upstream_history": "Original source was uncommitted. The initial local custody commit captures verified source bytes and does not reconstruct or impersonate upstream Git history.",
+  "repository": "https://github.com/Jacob-Met/loopkind",
+  "original_primary": "hamon-b378a5de",
+  "basis": {
+    "contributor": "hamon-8257-20261027",
+    "archive_sha256": "9954c89bb23d16a43414600faa9f8c724669efdc1f93be4a05efcb5590325db6",
+    "files": 17,
+    "application_sha256": "cd3a5ff52227c547122970e88d9a558e5a65538eaf4929899deaae8d1c84acff"
+  },
+  "contributions": [
+    {
+      "author": "hamon-e5de3c",
+      "scope": "Participant editor keyboard continuity",
+      "patch_sha256": "d7a9516b37a23947786dc4e878accdf54e7e368babc340bb038b0dd1411e8d20",
+      "source": "https://github.com/Jacob-Met/loopkind/issues/1#issuecomment-6503608366"
+    },
+    {
+      "author": "estate-gpt6-cd4280d1-414c-4e82-ba90-902e48d26725",
+      "scope": "Initial provider discovery lifetime",
+      "patch_sha256": "c85792ae5da121ac99766a6a45db9b3fa4b1807ea2f4051c10c8c39ede6f040a"
+    },
+    {
+      "author": "estate-4610aa27-bff3-4a5c-8b09-4797b40ec184",
+      "scope": "Request deadline recovery, responsive retry, selected-circle omissions and isolated composition"
+    }
+  ],
+  "publication": "Private integrated preview only. Original source ownership and adoption remain unchanged. No public release, live model qualification or real participant consent is asserted."
+}

@@ -186,7 +186,15 @@ function renderPlan(){
   node('p','proposal-subtitle',S.project.date+' · '+time(plan.metrics.startsAt)+'–'+time(plan.metrics.finishesAt)+' · UTC'+S.project.utcOffset));
  if(S.result?.plans.length>1){
   const options=node('div','plan-options');
-  options.append(labeled('Other workable circles',selectFor('plan-choice',S.result.plans.map((p,i)=>[p.id,'Circle '+(i+1)+' · '+p.members.length+' people · '+time(p.metrics.startsAt)+'–'+time(p.metrics.finishesAt)]),plan.id,id=>choosePlan(id))));root.append(options);
+  options.append(labeled('Other workable circles',selectFor('plan-choice',S.result.plans.map((p,i)=>[p.id,'Circle '+(i+1)+' · '+p.members.map(name).join(', ')+' · '+time(p.metrics.startsAt)+'–'+time(p.metrics.finishesAt)]),plan.id,id=>choosePlan(id))));
+  const comparison=node('details','circle-comparison');comparison.append(node('summary','','See everyone in each circle'));
+  const list=node('ol');
+  S.result.plans.forEach((candidate,index)=>{
+   const item=node('li');item.dataset.circlePlan=candidate.id;
+   item.append(node('strong','','Circle '+(index+1)+' · '+time(candidate.metrics.startsAt)+'–'+time(candidate.metrics.finishesAt)));
+   for(const id of candidate.members)item.append(node('p','',name(id)));list.append(item);
+  });
+  comparison.append(list);options.append(comparison);root.append(options);
  }
  const strip=node('div','circle-strip');strip.setAttribute('aria-label','Giving order around the circle');
  plan.members.forEach((id,i)=>{const chip=node('span','circle-member');add(chip,avatar(id),node('span','',name(id)));strip.append(chip);if(i<plan.members.length-1)strip.append(node('span','circle-arrow','→'));});

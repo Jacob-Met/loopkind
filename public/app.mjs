@@ -2,7 +2,7 @@ const $=s=>document.querySelector(s);
 const S={project:null,result:null,plan:null,review:null,actor:null,intake:null,provider:null,draft:null,epoch:0,busyPlan:false,busyReview:false,busyInterpret:false,reason:'',open:new Set()};
 const requests=new Set(),retirePending=new Set(),retireFlights=new Map();
 const STORAGE='loopkind.local-demo.v1';
-let saveTimer,saveRevision=0;
+let saveTimer,saveRevision=0,proposalSummaryPending=false;
 const copy=x=>structuredClone(x);
 function node(tag,className,text){const n=document.createElement(tag);if(className)n.className=className;if(text!==undefined)n.textContent=text;return n;}
 function add(parent,...children){for(const child of children)if(child)parent.append(child);return parent;}
@@ -184,6 +184,7 @@ function renderPlan(){
  add(root,add(node('p','plan-success'),node('span','success-dot','✓'),node('span','','A schedule that fits')),
   node('h3','proposal-title',plan.members.length+' people. One circle of help.'),
   node('p','proposal-subtitle',S.project.date+' · '+time(plan.metrics.startsAt)+'–'+time(plan.metrics.finishesAt)+' · UTC'+S.project.utcOffset));
+ const downloadSummary=button(proposalSummaryPending?'Preparing proposal summary…':'Download proposal summary','quiet small',downloadProposalSummary);downloadSummary.id='proposal-summary-btn';downloadSummary.disabled=proposalSummaryPending;root.append(downloadSummary);
  if(S.result?.plans.length>1){
   const options=node('div','plan-options');
   options.append(labeled('Other workable circles',selectFor('plan-choice',S.result.plans.map((p,i)=>[p.id,'Circle '+(i+1)+' · '+p.members.map(name).join(', ')+' · '+time(p.metrics.startsAt)+'–'+time(p.metrics.finishesAt)]),plan.id,id=>choosePlan(id))));
@@ -397,6 +398,42 @@ async function openFile(file){
   await adopt(safe,'Project opened and checked. Imported approvals were cleared; this is a fresh demo review.');
  }catch(error){if(intent===loadIntent&&epoch===S.epoch)fail(error);}
  finally{$('#import-file').value='';}
+}
+function proposalSummaryText(project,plan){
+ const label=value=>value.replace(/[\u2028\u2029]/g,' ');
+ const members=new Map(project.members.map(member=>[member.id,member])),skills=new Map(project.skills.map(skill=>[skill.id,skill.label]));
+ const memberName=id=>label(members.get(id).name),skillName=id=>label(skills.get(id));
+ const interval=task=>time(task.start)+'–'+time(task.end)+' · '+(task.end-task.start)+' minutes';
+ const lines=[label(project.title),'Date: '+project.date,'Fixed UTC offset: '+project.utcOffset,'','Local demo proposal. Approvals are simulated; no invitations have been sent and participant consent has not been verified.'];
+ if(plan.tasks.some(task=>task.start===1440||task.end===1440))lines.push('24:00 means the end of the stated date.');
+ lines.push('','Sessions');
+ for(const task of [...plan.tasks].sort((a,b)=>a.start-b.start||a.end-b.end||a.id.localeCompare(b.id)))lines.push(time(task.start)+'–'+time(task.end)+' · '+memberName(task.providerId)+' → '+memberName(task.recipientId)+' · '+skillName(task.skill)+' · '+(task.end-task.start)+' minutes');
+ lines.push('','Personal commitments');
+ for(const id of plan.members){
+  const giving=plan.tasks.find(task=>task.providerId===id),receiving=plan.tasks.find(task=>task.recipientId===id);
+  lines.push('',memberName(id),'Give: '+skillName(giving.skill)+' to '+memberName(giving.recipientId)+' · '+interval(giving),'Receive: '+skillName(receiving.skill)+' from '+memberName(receiving.providerId)+' · '+interval(receiving));
+ }
+ return lines.join('\n')+'\n';
+}
+async function downloadProposalSummary(){
+ if(!S.project||!S.plan||proposalSummaryPending)return;
+ const epoch=S.epoch,intent=loadIntent,planId=S.plan.id,snapshot=envelope();
+ const current=()=>epoch===S.epoch&&intent===loadIntent&&S.plan?.id===planId;
+ proposalSummaryPending=true;clearError();
+ const control=$('#proposal-summary-btn'),hadFocus=document.activeElement===control;
+ if(control){control.disabled=true;control.textContent='Preparing proposal summary…';}
+ try{
+  const safe=await api('/api/import',snapshot);if(!current())return;
+  if(!safe.selectedPlan||safe.selectedPlan.id!==planId)throw new Error('The selected proposal could not be validated. Find a fresh plan and try again.');
+  const text=proposalSummaryText(safe.project,safe.selectedPlan);
+  const url=URL.createObjectURL(new Blob([text],{type:'text/plain;charset=utf-8'})),link=node('a');link.href=url;link.download='loopkind-proposal-'+safe.project.date+'.txt';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  info('Proposal summary download requested. It contains this selected schedule, not participant consent.');
+ }catch(error){if(current())fail(error);}
+ finally{
+  proposalSummaryPending=false;const currentControl=$('#proposal-summary-btn');
+  if(currentControl){currentControl.disabled=false;currentControl.textContent='Download proposal summary';}
+  if(current()&&hadFocus&&currentControl===control&&(document.activeElement===document.body||document.activeElement===control))control.focus();
+ }
 }
 async function exportProject({onError=fail,onExport=null}={}){
  if(!S.project)return;

@@ -12,8 +12,20 @@
   <a class="skip" href="#workbench">Skip to workbench</a>
   <header class="topbar wrap">
     <a class="brand" href="/" aria-label="LOOPKIND home"><svg width="34" height="34" viewBox="0 0 40 40" aria-hidden="true"><path d="M20 5C7 5 4 18 11 24c6 5 14 1 14-6S15 9 10 15c-7 9 1 20 11 20 12 0 17-13 10-20" fill="none" stroke="currentColor" stroke-width="3.6" stroke-linecap="round"/></svg><span>loopkind<span class="brand-dot">.</span></span></a>
-    <div class="top-actions"><span id="save-status" class="save-status" role="status">Opening your workbench…</span><button id="export-btn" class="button quiet small" type="button">Export project <span aria-hidden="true">↗</span></button><button id="import-btn" class="button quiet small" type="button">Open project</button><input id="import-file" type="file" accept="application/json,.json" hidden></div>
+    <div class="top-actions"><span id="save-status" class="save-status" role="status">Opening your workbench…</span><button id="new-day-btn" class="button quiet small" type="button">New day</button><button id="export-btn" class="button quiet small" type="button">Export project <span aria-hidden="true">↗</span></button><button id="import-btn" class="button quiet small" type="button">Open project</button><input id="import-file" type="file" accept="application/json,.json" hidden></div>
   </header>
+  <dialog id="new-day-dialog" class="new-day-dialog" aria-labelledby="new-day-heading" aria-describedby="new-day-description">
+    <form id="new-day-form">
+      <h2 id="new-day-heading">Start a new day</h2>
+      <p id="new-day-description">This browser keeps one project. Replacing it discards the current day and unsaved edits, and clears its simulated review. Your skill labels are kept; the new day starts with no people. No invitations are sent.</p>
+      <label>Title<input id="new-day-title" maxlength="120" required></label>
+      <div class="new-day-fields"><label>Date<input id="new-day-date" type="date" required></label><label>Fixed UTC offset<input id="new-day-offset" maxlength="6" placeholder="-07:00" required></label></div>
+      <button id="new-day-export" class="button quiet small" type="button">Export current project first</button>
+      <p id="new-day-export-status" role="status"></p>
+      <p id="new-day-error" class="notice error" role="alert" hidden></p>
+      <div class="new-day-actions"><button id="new-day-cancel" class="button quiet" type="button">Cancel</button><button id="new-day-replace" class="button primary" type="submit">Replace with new day</button></div>
+    </form>
+  </dialog>
   <main class="wrap">
     <section class="hero" aria-labelledby="hero-title">
       <div class="hero-copy">

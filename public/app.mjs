@@ -177,7 +177,7 @@ function renderPlan(){
  if(!S.plan){
   if(S.result){renderNoPlan(root);return;}
   const empty=node('div','empty-plan');
-  add(empty,node('div','empty-symbol','↺'),node('h3','',S.reason?'A fresh look, together.':'Good things go around.'),node('p','',S.reason||'Start with the three neighbours on the left. We will look for a circle and a time they can all keep.'));
+  add(empty,node('div','empty-symbol','↺'),node('h3','',S.reason?'A fresh look, together.':'Good things go around.'),node('p','',S.project.members.length===0?'Add people and review their offers, requests and availability. Use Skills in this circle to see or add shared skill labels. All approvals remain simulated.':S.reason||'Review the people on the left. We will look for a circle and a time they can all keep.'));
   root.append(empty);return;
  }
  const plan=S.plan;
@@ -398,17 +398,53 @@ async function openFile(file){
  }catch(error){if(intent===loadIntent&&epoch===S.epoch)fail(error);}
  finally{$('#import-file').value='';}
 }
-async function exportProject(){
+async function exportProject({onError=fail,onExport=null}={}){
  if(!S.project)return;
  const epoch=S.epoch;$('#export-btn').disabled=true;clearError();
  try{
   const safe=await api('/api/import',envelope());if(epoch!==S.epoch)return;
   const data={format:safe.format,version:safe.version,mode:safe.mode,project:safe.project,selectedPlan:safe.selectedPlan,approvals:[],history:[]};
   const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)+'\n'],{type:'application/json'})),link=node('a');link.href=url;link.download='loopkind-'+S.project.date+'.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
-  info('Project exported. It includes the reviewed schedule, when present. Reopening it starts with no approvals.');
- }catch(error){if(epoch===S.epoch)fail(error);}
+  info('Project export requested. It includes the reviewed schedule, when present. Reopening it starts with no approvals.');
+  if(onExport)onExport();
+ }catch(error){if(epoch===S.epoch)onError(error);}
  finally{$('#export-btn').disabled=false;}
 }
+
+let newDayGeneration=0,newDayContext=null;
+const newDayDialog=$('#new-day-dialog');
+function setNewDayFieldsDisabled(disabled){for(const id of ['new-day-title','new-day-date','new-day-offset'])$('#'+id).disabled=disabled;}
+function newDayError(message){const error=$('#new-day-error');error.textContent=message;error.hidden=!message;}
+function cancelNewDay(){newDayGeneration++;newDayContext=null;newDayDialog.close();}
+$('#new-day-btn').addEventListener('click',()=>{
+ if(!S.project)return;
+ newDayGeneration++;newDayContext={epoch:S.epoch,intent:loadIntent};
+ $('#new-day-title').value='My circle of help';$('#new-day-date').value=S.project.date;$('#new-day-offset').value=S.project.utcOffset;
+ setNewDayFieldsDisabled(false);$('#new-day-replace').disabled=false;$('#new-day-export').disabled=false;$('#new-day-export-status').textContent='';newDayError('');newDayDialog.showModal();$('#new-day-title').focus();
+});
+$('#new-day-cancel').addEventListener('click',cancelNewDay);
+newDayDialog.addEventListener('cancel',event=>{event.preventDefault();cancelNewDay();});
+$('#new-day-export').addEventListener('click',async()=>{
+ const generation=newDayGeneration;$('#new-day-export').disabled=true;
+ await exportProject({onError:error=>{if(generation===newDayGeneration&&newDayDialog.open)newDayError(error.message);},onExport:()=>{if(generation===newDayGeneration&&newDayDialog.open)$('#new-day-export-status').textContent='Download requested. Check your browser downloads before replacing this day.';}});
+ if(generation===newDayGeneration)$('#new-day-export').disabled=false;
+});
+$('#new-day-form').addEventListener('submit',async event=>{
+ event.preventDefault();if(!newDayContext||$('#new-day-replace').disabled)return;
+ if(newDayContext.epoch!==S.epoch||newDayContext.intent!==loadIntent){newDayError('The current project changed. Cancel and open New day again to use its current date and skills.');return;}
+ const generation=newDayGeneration,epoch=S.epoch,intent=++loadIntent;newDayContext.intent=intent;
+ const fresh={format:'loopkind-demo',version:1,mode:'local-demo',project:{version:1,title:$('#new-day-title').value,date:$('#new-day-date').value,utcOffset:$('#new-day-offset').value,skills:copy(S.project.skills),members:[]},selectedPlan:null,approvals:[],history:[]};
+ $('#new-day-replace').disabled=true;setNewDayFieldsDisabled(true);newDayError('');
+ try{
+  const safe=await api('/api/import',fresh);
+  if(generation!==newDayGeneration||!newDayDialog.open)return;
+  if(epoch!==S.epoch||intent!==loadIntent){newDayError('The current project changed. Your newer project was kept. Cancel and open New day again.');return;}
+  newDayGeneration++;newDayContext=null;newDayDialog.close();
+  await adopt(safe,'New day opened. Add people and review their details. Earlier simulated approvals are cleared.');$('#add-person-btn').focus();
+ }catch(error){if(generation===newDayGeneration&&newDayDialog.open)newDayError(epoch!==S.epoch||intent!==loadIntent||error.name==='AbortError'?'The current project changed. Your newer project was kept. Cancel and open New day again.':error.message);}
+ finally{if(generation===newDayGeneration){$('#new-day-replace').disabled=false;setNewDayFieldsDisabled(false);}}
+});
+
 $('#find-plan-btn').addEventListener('click',findPlan);
 $('#scenario').addEventListener('change',e=>openExample(e.target.value));
 $('#project-title').addEventListener('input',e=>{if(!S.project)return;S.project.title=e.target.value;invalidate('The project changed. Find a new plan for a fresh review.');});
@@ -441,7 +477,7 @@ $('#intake-text').addEventListener('input',e=>{
  invalidate('A note changed. Check that person’s details before finding a new plan.',{refreshPeople:true});
 });
 $('#interpret-btn').addEventListener('click',interpret);
-$('#export-btn').addEventListener('click',exportProject);
+$('#export-btn').addEventListener('click',()=>exportProject());
 $('#import-btn').addEventListener('click',()=>$('#import-file').click());
 $('#import-file').addEventListener('change',e=>openFile(e.target.files[0]));
 async function initialize(){

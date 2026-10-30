@@ -1,5 +1,5 @@
 
-  const NEBIUS_CHAT_URL='https://api.tokenfactory.us-central1.nebius.com/v1/chat/completions';
+  const NEBIUS_CHAT_URL='https://api.tokenfactory.nebius.com/v1/chat/completions';
   const DEFAULT_MODEL='nvidia/nemotron-3-super-120b-a12b';
   const FIELDS=['offer','need','durationMinutes','windows','afterReceive','materialsReady'];
   const own=(o,k)=>Object.prototype.hasOwnProperty.call(o,k),object=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);

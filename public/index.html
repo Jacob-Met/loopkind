@@ -2,9 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#254a37">
+  <meta name="theme-color" content="#101418">
   <meta name="description" content="Find a small circle of community help, with a schedule everyone can review.">
-  <title>LOOPKIND — A little help, full circle</title>
+  <title>LOOPKIND — circles of help</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/style.css">
   <script src="/app.mjs" type="module"></script>
 </head>
@@ -27,52 +27,37 @@
     </form>
   </dialog>
   <main class="wrap">
-    <section class="hero" aria-labelledby="hero-title">
-      <div class="hero-copy">
-        <p class="eyebrow"><span class="tiny-sun" aria-hidden="true">✳</span> A neighbourhood full of possibilities</p>
-        <h1 id="hero-title">A little help can<br>come <em>full circle.</em></h1>
-        <p class="hero-intro">You mend a jacket. Someone tends your plants. A third person untangles a spreadsheet. Find the time that works for everyone.</p>
-        <div class="hero-principles"><span>Give what you know</span><span>Get a hand</span><span>Agree together</span></div>
-      </div>
-      <div class="hero-note">
-        <div class="paper-stamp">GOOD THINGS<br>GO AROUND</div>
-        <div class="note-avatars" aria-hidden="true"><span class="avatar tone-0">M</span><span class="avatar tone-1">T</span><span class="avatar tone-2">J</span></div>
-        <p>“I can help you,<br>if someone can help me.”</p>
-        <span class="note-caption">A small circle. A shared plan.</span>
-        <svg class="note-loop" width="110" height="64" viewBox="0 0 110 64" aria-hidden="true"><path d="M9 33C26 61 83 58 94 30S67 1 64 20c-2 15 19 25 37 21M91 30l11 12-14 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </div>
-    </section>
     <div class="demo-note"><span class="demo-dot" aria-hidden="true"></span><strong>Local demo</strong><span>Fictional neighbours · approvals are simulated · no invitations sent</span></div>
     <div id="notice" class="notice" role="status" hidden></div>
     <div id="error" class="notice error" role="alert" hidden></div>
     <section id="workbench" class="workbench" aria-label="Community help workbench">
       <div class="project-bar">
-        <div class="project-heading"><p class="eyebrow">Your shared day</p><label class="sr-only" for="project-title">Project title</label><input id="project-title" class="title-input" maxlength="120" autocomplete="off"></div>
+        <div class="project-heading"><label class="sr-only" for="project-title">Project title</label><input id="project-title" class="title-input" maxlength="120" autocomplete="off"></div>
         <div class="day-fields"><label>Date<input id="project-date" type="date"></label><label>Fixed UTC offset<input id="project-offset" type="text" maxlength="6" placeholder="-07:00" pattern="[+-][0-9]{2}:[0-9]{2}"></label></div>
         <label class="example-label">Explore an example<select id="scenario"><option value="three">Three people, one circle</option><option value="four">Four people, parallel help</option><option value="circular">Everyone needs help first</option><option value="tight">Not quite enough time</option></select></label>
       </div>
       <div class="workspace-grid">
         <section class="people-panel" aria-labelledby="people-title">
-          <div class="section-heading"><div><p class="eyebrow">01 / The people</p><h2 id="people-title">What can we share?</h2></div><span id="people-count" class="count-pill">0 people</span></div>
-          <p class="section-description">Each person brings one skill and one request. Open a card to review their time and conditions.</p>
+          <div class="section-heading"><div><h2 id="people-title">People</h2></div><span id="people-count" class="count-pill">0 people</span></div>
+          <p class="section-description">One offer and one need each. Open a card to review time and conditions.</p>
           <div id="people-list"></div>
           <button id="add-person-btn" type="button" class="button quiet add-person">+ Add a person</button>
           <details class="catalog"><summary>Skills in this circle</summary><p class="muted">A shared label helps match an offer with a request. Review the actual task together.</p><div id="skill-list"></div><form id="skill-form"><label class="sr-only" for="new-skill">New skill</label><input id="new-skill" maxlength="120" placeholder="A skill to share" required><button class="button quiet small" type="submit">Add skill</button></form></details>
           <aside class="details-note"><span aria-hidden="true">↳</span><p>Checking someone’s details is separate from approving a shared plan. Every changed plan needs a new review.</p></aside>
         </section>
         <section class="plan-panel" aria-labelledby="plan-heading">
-          <div class="section-heading"><div><p class="eyebrow">02 / The shared plan</p><h2 id="plan-heading">Find the way around.</h2></div><span class="sparkle" aria-hidden="true">✳</span></div>
-          <p class="section-description">A workable circle gives everyone a hand, respects their conditions, and never books a person twice.</p>
-          <button id="find-plan-btn" type="button" class="button primary find-button">Find a shared plan <span aria-hidden="true">↗</span></button>
+          <div class="section-heading"><div><h2 id="plan-heading">Circle</h2></div></div>
+          <p class="section-description">Every person gives once and receives once, inside shared time, never double-booked.</p>
+          <button id="find-plan-btn" type="button" class="button primary find-button">Find circles</button>
           <div id="plan-content" aria-live="polite"></div>
         </section>
       </div>
     </section>
     <section class="intake-panel" aria-labelledby="intake-heading">
-      <div class="intake-copy"><p class="eyebrow">Start in your own words</p><h2 id="intake-heading">A note can be<br>a beginning.</h2><p>Describe what you can give, what you need, and when you are free. Optional model interpretation proposes a draft with source quotes for you to check.</p><p id="provider-status" class="provider-status">Checking optional note interpretation…</p></div>
+      <div class="intake-copy"><h2 id="intake-heading">Write a note, Nemotron drafts the fields</h2><p>Describe what you can give, what you need and when you are free. NVIDIA Nemotron on Nebius Token Factory proposes a draft with a quoted source for every value; the app rejects any value its quote does not support, and you review before it counts.</p><p id="provider-status" class="provider-status">Checking optional note interpretation…</p></div>
       <div class="intake-form"><label for="intake-person">Whose note are we reviewing?</label><select id="intake-person"></select><label for="intake-text">Offer, request, time and conditions</label><textarea id="intake-text" rows="5" maxlength="3000" placeholder="I can mend clothing for 45 minutes. I need plant care. On 2026-10-31 I am free 09:00–11:00 at UTC−07:00…"></textarea><p class="field-hint">Use the selected date, 24-hour times and fixed UTC offset. Unstated details stay unanswered.</p><button id="interpret-btn" type="button" class="button quiet">Suggest fields from this note</button><div id="draft-preview"></div></div>
     </section>
-    <footer><a class="brand footer-brand" href="/">loopkind.</a><p>A little structure for everyday generosity.</p><p class="footer-limit">Local prototype · 2–4 people per circle · one date · 15-minute time slots</p></footer>
+    <footer><a class="brand footer-brand" href="/">loopkind</a><p class="footer-limit">Local prototype · 2–4 people per circle · one date · 15-minute time slots</p></footer>
   </main>
 </body>
 </html>

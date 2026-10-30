@@ -163,7 +163,7 @@ function renderPeople(){
 }
 function updateButtons(){
  $('#find-plan-btn').disabled=!S.project||S.busyPlan;
- $('#find-plan-btn').textContent=S.busyPlan?'Finding a shared plan…':'Find a shared plan ↗';
+ $('#find-plan-btn').textContent=S.busyPlan?'Finding circles…':'Find circles';
  $('#interpret-btn').disabled=!S.project||!S.provider?.configured||S.busyInterpret||!S.intake;
  $('#interpret-btn').textContent=S.busyInterpret?'Reading this note…':'Suggest fields from this note';
 }

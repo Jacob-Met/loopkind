@@ -70,7 +70,7 @@ test('missing credentials and non-NVIDIA model configurations never dispatch',as
 });
 test('injected upstream contract sends only source/catalog/date/offset and returns a draft',async()=>{
  let calls=0;const f=fixture(),p=createNebiusProvider({env:ENV,fetchImpl:async(url,options)=>{
-  calls++;assert.equal(url,NEBIUS_CHAT_URL);assert.equal(url,'https://api.tokenfactory.us-central1.nebius.com/v1/chat/completions');assert.equal(options.method,'POST');assert.equal(options.redirect,'error');assert.equal(options.headers.Authorization,'Bearer '+KEY);assert.ok(options.signal instanceof AbortSignal);
+  calls++;assert.equal(url,NEBIUS_CHAT_URL);assert.equal(url,'https://api.tokenfactory.nebius.com/v1/chat/completions');assert.equal(options.method,'POST');assert.equal(options.redirect,'error');assert.equal(options.headers.Authorization,'Bearer '+KEY);assert.ok(options.signal instanceof AbortSignal);
   const body=JSON.parse(options.body);assert.equal(body.model,'nvidia/test-fixture');assert.equal(body.stream,false);assert.equal(body.max_tokens,1600);assert.equal(body.response_format,undefined);assert.equal(body.messages.length,2);assert.equal(body.messages[0].role,'system');assert.equal(body.messages[1].role,'user');assert.deepEqual(JSON.parse(body.messages[1].content),f.request);assert.ok(!options.body.includes('private-future-outcome'));return response(f.raw);
  }});
  const result=await p.interpret({...f.request,hiddenFuture:'private-future-outcome',active:true,confirmed:true});assert.equal(calls,1);assert.equal(result.proposal.confirmed,false);assert.deepEqual(result.provider,{model:'nvidia/test-fixture',requestId:'request-fixture-123',verified:true});assert.equal(p.status().verified,false);assert.ok(!JSON.stringify(result).includes(KEY));
@@ -108,4 +108,11 @@ test('network errors are safe and not automatically retried',async()=>{
 test('unsafe upstream request identifiers are withheld',async()=>{
  const p=createNebiusProvider({env:ENV,fetchImpl:async()=>new Response(JSON.stringify({id:'<unsafe request identifier>',choices:[{finish_reason:'stop',message:{content:JSON.stringify(fixture().raw)}}]}),{headers:{'x-request-id':'unsafe request id with spaces'}})});
  const result=await p.interpret(fixture().request);assert.equal(result.provider.requestId,null);assert.equal(result.proposal.confirmed,false);
+});
+test('the standard NEBIUS_API_KEY variable configures the default Nemotron model on the Token Factory endpoint',async()=>{
+ let seen;const f=fixture(),provider=createNebiusProvider({env:{NEBIUS_API_KEY:KEY},fetchImpl:async(url,init)=>{seen={url,body:JSON.parse(init.body),auth:init.headers.Authorization};return response(f.raw);}});
+ assert.deepEqual(provider.status(),{configured:true,model:DEFAULT_MODEL,verified:false});
+ const result=await provider.interpret(f.request);
+ assert.equal(seen.url,'https://api.tokenfactory.nebius.com/v1/chat/completions');assert.match(seen.body.model,/^nvidia\/.*nemotron/i);assert.ok(seen.body.max_tokens>=1500);assert.equal(seen.auth,'Bearer '+KEY);
+ assert.equal(result.provider.verified,true);assert.equal(result.proposal.confirmed,false);
 });
